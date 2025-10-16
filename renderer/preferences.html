@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PasteBro Preferences</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    .container {
+      max-width: 560px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 24px;
+      color: #333;
+    }
+
+    .pref-group {
+      margin-bottom: 24px;
+    }
+
+    .pref-group h2 {
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: #666;
+    }
+
+    .pref-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .pref-item:last-child {
+      border-bottom: none;
+    }
+
+    .pref-label {
+      font-size: 14px;
+      color: #333;
+    }
+
+    .pref-control input[type="number"] {
+      width: 100px;
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .pref-control input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    .save-btn {
+      width: 100%;
+      padding: 12px;
+      background: #007AFF;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+
+    .save-btn:hover {
+      background: #0066DD;
+    }
+
+    .action-btn {
+      padding: 6px 12px;
+      background: #666;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      margin-left: 8px;
+    }
+
+    .action-btn:hover {
+      background: #555;
+    }
+
+    .info-text {
+      font-size: 12px;
+      color: #999;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Preferences</h1>
+
+    <div class="pref-group">
+      <h2>Sidebar</h2>
+      <div class="pref-item">
+        <div class="pref-label">Items to show in sidebar</div>
+        <div class="pref-control">
+          <input type="number" id="sidebarItemLimit" min="10" max="500" step="10" />
+        </div>
+      </div>
+      <div class="info-text" style="margin-top: 4px; margin-bottom: 12px;">
+        Number of recent items to display in the sidebar (10-500)
+      </div>
+    </div>
+
+    <div class="pref-group">
+      <h2>Storage</h2>
+      <div class="pref-item">
+        <div class="pref-label">Maximum history items</div>
+        <div class="pref-control">
+          <input type="number" id="maxHistoryItems" min="100" max="10000" step="100" />
+        </div>
+      </div>
+      <div class="pref-item">
+        <div class="pref-label">Retention period (days)</div>
+        <div class="pref-control">
+          <input type="number" id="retentionDays" min="1" max="365" />
+        </div>
+      </div>
+    </div>""
+
+    <div class="pref-group">
+      <h2>Keyboard</h2>
+      <div class="pref-item">
+        <div class="pref-label">Global hotkey to toggle sidebar</div>
+        <div class="pref-control">
+          <input type="text" id="globalHotkey" placeholder="CommandOrControl+L" />
+        </div>
+      </div>
+      <div class="info-text" style="margin-top: 4px; margin-bottom: 12px;">
+        Examples: CommandOrControl+L, Alt+V, CommandOrControl+Shift+V
+      </div>
+    </div>
+
+    <div class="pref-group">
+      <h2>Behavior</h2>
+      <div class="pref-item">
+        <div class="pref-label">Auto-hide after copy</div>
+        <div class="pref-control">
+          <input type="checkbox" id="autoHideAfterCopy" />
+        </div>
+      </div>
+      <div class="pref-item">
+        <div class="pref-label">Copy with formatting</div>
+        <div class="pref-control">
+          <input type="checkbox" id="copyWithFormatting" />
+        </div>
+      </div>
+      <div class="pref-item">
+        <div class="pref-label">Launch at login</div>
+        <div class="pref-control">
+          <input type="checkbox" id="launchAtLogin" />
+        </div>
+      </div>
+    </div>
+
+    <div class="pref-group">
+      <h2>Data Management</h2>
+      <div class="pref-item">
+        <div class="pref-label">Export clipboard history</div>
+        <div class="pref-control">
+          <button class="action-btn" id="exportBtn">Export</button>
+        </div>
+      </div>
+      <div class="pref-item">
+        <div class="pref-label">Import clipboard history</div>
+        <div class="pref-control">
+          <button class="action-btn" id="importBtn">Import (Merge)</button>
+          <button class="action-btn" id="importReplaceBtn">Import (Replace)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-text">
+      Storage location: ~/Library/Application Support/pastebro/pastebro.db
+    </div>
+
+    <button class="save-btn" id="saveBtn">Save Preferences</button>
+  </div>
+
+  <script src="preferences.js"></script>
+</body>
+
+</html>

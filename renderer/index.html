@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PasteBro</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="sidebar" class="sidebar">
+    <div class="search-container">
+      <input type="text" id="search-input" placeholder="Search clipboard..." />
+    </div>
+    
+    <div class="filter-tabs">
+      <button class="tab active" data-filter="all">All</button>
+      <button class="tab" data-filter="pinned">Pinned</button>
+      <button class="tab" data-filter="trash">Trash</button>
+    </div>
+    
+    <div class="toolbar">
+      <button id="delete-all-btn" class="toolbar-btn">Delete All</button>
+    </div>
+    
+    <div id="items-container" class="items-container">
+      <!-- Clipboard items will be rendered here -->
+    </div>
+  </div>
+  
+  <script src="app.js"></script>
+</body>
+</html>
