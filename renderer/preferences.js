@@ -3,8 +3,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (window.electronAPI) {
     const prefs = await window.electronAPI.getPreferences();
     
-    document.getElementById('globalHotkey').value = prefs.globalHotkey || 'CommandOrControl+L';
+    document.getElementById('globalHotkey').value = prefs.globalHotkey || 'Command+L';
     document.getElementById('sidebarItemLimit').value = prefs.sidebarItemLimit || 100;
+    document.getElementById('saveImages').checked = prefs.saveImages === true; // Default false
     document.getElementById('maxHistoryItems').value = prefs.maxHistoryItems || 1000;
     document.getElementById('retentionDays').value = prefs.retentionDays || 30;
     document.getElementById('autoHideAfterCopy').checked = prefs.autoHideAfterCopy || false;
@@ -17,6 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const prefs = {
       globalHotkey: document.getElementById('globalHotkey').value,
       sidebarItemLimit: parseInt(document.getElementById('sidebarItemLimit').value),
+      saveImages: document.getElementById('saveImages').checked,
       maxHistoryItems: parseInt(document.getElementById('maxHistoryItems').value),
       retentionDays: parseInt(document.getElementById('retentionDays').value),
       autoHideAfterCopy: document.getElementById('autoHideAfterCopy').checked,

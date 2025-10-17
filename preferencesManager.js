@@ -10,7 +10,7 @@ class PreferencesManager {
         this.prefsPath = path.join(app.getPath('userData'), 'preferences.json');
         
         this.defaults = {
-            globalHotkey: 'CommandOrControl+L',
+            globalHotkey: 'Command+L',
             copyWithFormatting: true,
             pasteWithFormatting: true,
             autoHideAfterCopy: true,
@@ -24,7 +24,7 @@ class PreferencesManager {
             ignorePasswords: false,
             enableSoundEffects: false,
             theme: 'system', // system, light, dark
-            saveImages: true // Enable/disable image storage
+            saveImages: false // Enable/disable image storage (default: disabled to save space)
         };
 
         this.preferences = this.load();

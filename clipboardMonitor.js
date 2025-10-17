@@ -325,23 +325,41 @@ class ClipboardMonitor {
 
             // Check if we have files (single or multiple) - create separate items for each
             if (content.files && content.files.length > 0) {
+                console.log(`Processing ${content.files.length} files from clipboard`);
+
+                // Check if image saving is enabled
+                const saveImages = this.preferencesManager ? this.preferencesManager.get('saveImages') : true;
+
                 // Return array of items (one per file)
                 const items = [];
                 for (const filePath of content.files) {
                     if (this.isImageFile(filePath)) {
-                        const imageData = this.loadImageFromFile(filePath);
-                        if (imageData && this.imageStorageManager) {
-                            const { id, imagePath, thumbnailPath, fileSize } = await this.imageStorageManager.saveImage(imageData);
+                        if (saveImages && this.imageStorageManager) {
+                            const imageData = this.loadImageFromFile(filePath);
+                            if (imageData) {
+                                const { id, imagePath, thumbnailPath, fileSize } = await this.imageStorageManager.saveImage(imageData);
+                                items.push(new ClipboardItem({
+                                    id: id,
+                                    type: ClipboardItemType.IMAGE,
+                                    imagePath: imagePath,
+                                    thumbnailPath: thumbnailPath,
+                                    imageData: null,
+                                    imageThumbnail: null,
+                                    contentHash: this.generateContentHash({ image: imageData }),
+                                    fileSize: fileSize,
+                                    sourceApplication: sourceApp
+                                }));
+                                console.log(`Saved image: ${filePath.split('/').pop()}`);
+                            }
+                        } else {
+                            // Don't save image - just track filename
                             items.push(new ClipboardItem({
-                                id: id,
                                 type: ClipboardItemType.IMAGE,
-                                imagePath: imagePath,
-                                thumbnailPath: thumbnailPath,
                                 imageData: null,
                                 imageThumbnail: null,
-                                contentHash: this.generateContentHash({ image: imageData }),
-                                fileSize: fileSize,
-                                sourceApplication: sourceApp
+                                contentHash: this.generateContentHash({ fileUrl: filePath }),
+                                sourceApplication: sourceApp,
+                                plainText: filePath.split('/').pop()
                             }));
                         }
                     } else {
@@ -353,6 +371,7 @@ class ClipboardMonitor {
                         }));
                     }
                 }
+                console.log(`Created ${items.length} clipboard items`);
                 return items.length === 1 ? items[0] : items; // Return single item or array
             }
 

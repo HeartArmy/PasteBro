@@ -64,7 +64,15 @@
     "files": [
       "main.js",
       "preload.js",
+      "clipboardMonitor.js",
+      "clipboardItem.js",
+      "database.js",
+      "historyManager.js",
+      "preferencesManager.js",
+      "permissionManager.js",
+      "imageStorageManager.js",
       "renderer/**/*",
+      "assets/**/*",
       "node_modules/**/*",
       "package.json"
     ]

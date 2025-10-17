@@ -223,7 +223,7 @@ function Sidebar({ items, onCopy, onDelete, onPin, onSearch }) {
 class PreferencesManager {
     constructor() {
         this.defaults = {
-            globalHotkey: 'CommandOrControl+L',
+            globalHotkey: 'Command+L',
             copyWithFormatting: true,
             pasteWithFormatting: true,
             autoHideAfterCopy: true,

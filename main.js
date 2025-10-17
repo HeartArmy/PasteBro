@@ -190,23 +190,30 @@ class PasteBroApp {
 
   async handleClipboardChange(item) {
     try {
-      // Add item to history (non-blocking)
-      this.historyManager.addItem(item).then(itemId => {
-        if (itemId && this.mainWindow) {
-          // Send lightweight notification without full image data
-          const notification = {
-            id: item.id,
-            type: item.type,
-            timestamp: item.timestamp,
-            isPinned: item.isPinned,
-            plainText: item.plainText,
-            sourceApplication: item.sourceApplication
-          };
-          this.mainWindow.webContents.send('clipboard-updated', notification);
-        }
-      }).catch(error => {
-        console.error('Error adding item to history:', error);
-      });
+      // Handle both single item and array of items
+      const items = Array.isArray(item) ? item : [item];
+      
+      for (const singleItem of items) {
+        // Add item to history (non-blocking)
+        this.historyManager.addItem(singleItem).then(itemId => {
+          if (itemId && this.mainWindow) {
+            // Send full item data including image paths for immediate preview
+            const notification = {
+              id: singleItem.id,
+              type: singleItem.type,
+              timestamp: singleItem.timestamp,
+              isPinned: singleItem.isPinned,
+              plainText: singleItem.plainText,
+              sourceApplication: singleItem.sourceApplication,
+              imagePath: singleItem.imagePath,
+              thumbnailPath: singleItem.thumbnailPath
+            };
+            this.mainWindow.webContents.send('clipboard-updated', notification);
+          }
+        }).catch(error => {
+          console.error('Error adding item to history:', error);
+        });
+      }
     } catch (error) {
       console.error('Error handling clipboard change:', error);
     }
@@ -262,7 +269,12 @@ class PasteBroApp {
 
         if (item.type === 'text' || item.type === 'richText') {
           if (item.richText && this.preferencesManager.get('copyWithFormatting')) {
-            clipboard.writeHTML(item.richText);
+            // Write both HTML and RTF to preserve formatting across apps
+            clipboard.write({
+              text: item.plainText || '',
+              html: item.richText,
+              rtf: item.richText // RTF format for apps like Word, Pages
+            });
           } else {
             clipboard.writeText(item.plainText || '');
           }
@@ -674,7 +686,7 @@ class PasteBroApp {
 
   registerGlobalShortcuts() {
     // Get hotkey from preferences
-    const hotkey = this.preferencesManager.get('globalHotkey') || 'CommandOrControl+L';
+    const hotkey = this.preferencesManager.get('globalHotkey') || 'Command+L';
 
     const ret = globalShortcut.register(hotkey, () => {
       this.toggleSidebar();

@@ -133,6 +133,15 @@
     <div class="pref-group">
       <h2>Storage</h2>
       <div class="pref-item">
+        <div class="pref-label">Save images to disk</div>
+        <div class="pref-control">
+          <input type="checkbox" id="saveImages" />
+        </div>
+      </div>
+      <div class="info-text" style="margin-top: 4px; margin-bottom: 12px;">
+        When disabled, only image metadata is saved (saves disk space)
+      </div>
+      <div class="pref-item">
         <div class="pref-label">Maximum history items</div>
         <div class="pref-control">
           <input type="number" id="maxHistoryItems" min="100" max="10000" step="100" />
@@ -144,18 +153,18 @@
           <input type="number" id="retentionDays" min="1" max="365" />
         </div>
       </div>
-    </div>""
+    </div>
 
     <div class="pref-group">
       <h2>Keyboard</h2>
       <div class="pref-item">
         <div class="pref-label">Global hotkey to toggle sidebar</div>
         <div class="pref-control">
-          <input type="text" id="globalHotkey" placeholder="CommandOrControl+L" />
+          <input type="text" id="globalHotkey" placeholder="Command+L" />
         </div>
       </div>
       <div class="info-text" style="margin-top: 4px; margin-bottom: 12px;">
-        Examples: CommandOrControl+L, Alt+V, CommandOrControl+Shift+V
+        Examples: Command+L, Alt+V, Command+Shift+V
       </div>
     </div>
 
