@@ -23,7 +23,8 @@ class PreferencesManager {
             excludedApplications: [],
             ignorePasswords: false,
             enableSoundEffects: false,
-            theme: 'system' // system, light, dark
+            theme: 'system', // system, light, dark
+            saveImages: true // Enable/disable image storage
         };
 
         this.preferences = this.load();

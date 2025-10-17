@@ -8,9 +8,10 @@ const ImageStorageManager = require('./imageStorageManager');
  * Polls clipboard every 50ms and detects changes via content hashing
  */
 class ClipboardMonitor {
-    constructor(onClipboardChange, imageStorageManager = null) {
+    constructor(onClipboardChange, imageStorageManager = null, preferencesManager = null) {
         this.onClipboardChange = onClipboardChange;
         this.imageStorageManager = imageStorageManager;
+        this.preferencesManager = preferencesManager;
         this.lastHash = null;
         this.interval = null;
         this.pollInterval = 50; // 50ms as per requirements
@@ -289,31 +290,37 @@ class ClipboardMonitor {
             const sourceApp = this.getActiveApplication();
 
             // Direct image from clipboard (highest priority)
-            if (content.image && this.imageStorageManager) {
-                // Save image to file storage
-                const { id, imagePath, thumbnailPath, fileSize } = await this.imageStorageManager.saveImage(content.image);
+            if (content.image) {
+                // Check if image saving is enabled
+                const saveImages = this.preferencesManager ? this.preferencesManager.get('saveImages') : true;
 
-                return new ClipboardItem({
-                    id: id,
-                    type: ClipboardItemType.IMAGE,
-                    imagePath: imagePath,
-                    thumbnailPath: thumbnailPath,
-                    imageData: null, // Don't store in DB
-                    imageThumbnail: null,
-                    contentHash: contentHash,
-                    fileSize: fileSize,
-                    sourceApplication: sourceApp
-                });
-            } else if (content.image) {
-                // Fallback if no storage manager
-                return new ClipboardItem({
-                    type: ClipboardItemType.IMAGE,
-                    imageData: content.image,
-                    imageThumbnail: null,
-                    contentHash: contentHash,
-                    fileSize: content.image.length,
-                    sourceApplication: sourceApp
-                });
+                if (saveImages && this.imageStorageManager) {
+                    // Save image to file storage
+                    const { id, imagePath, thumbnailPath, fileSize } = await this.imageStorageManager.saveImage(content.image);
+
+                    return new ClipboardItem({
+                        id: id,
+                        type: ClipboardItemType.IMAGE,
+                        imagePath: imagePath,
+                        thumbnailPath: thumbnailPath,
+                        imageData: null, // Don't store in DB
+                        imageThumbnail: null,
+                        contentHash: contentHash,
+                        fileSize: fileSize,
+                        sourceApplication: sourceApp
+                    });
+                } else {
+                    // Don't save image - just track metadata
+                    return new ClipboardItem({
+                        type: ClipboardItemType.IMAGE,
+                        imageData: null,
+                        imageThumbnail: null,
+                        contentHash: contentHash,
+                        fileSize: content.image.length,
+                        sourceApplication: sourceApp,
+                        plainText: '🖼️ Image (not saved)'
+                    });
+                }
             }
 
             // Check if we have files (single or multiple) - create separate items for each

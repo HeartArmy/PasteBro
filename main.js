@@ -132,10 +132,10 @@ class PasteBroApp {
       this.historyManager.enforceStorageLimits();
     });
 
-    // Initialize clipboard monitor with image storage
+    // Initialize clipboard monitor with image storage and preferences
     this.clipboardMonitor = new ClipboardMonitor((item) => {
       this.handleClipboardChange(item);
-    }, this.imageStorageManager);
+    }, this.imageStorageManager, this.preferencesManager);
   }
 
   async migrateBlobImagesToFiles() {
