@@ -4,6 +4,8 @@ A fast, lightweight clipboard manager for macOS that actually works over fullscr
 
 Inspired by Maccy and PastePal, but built to be faster, simpler, and actually appear above fullscreen apps without forcing you to exit fullscreen mode.
 
+**Default shortcut: Cmd+L to open the sidebar**
+
 ## Why PasteBro?
 
 - **Actually works in fullscreen** - Appears above fullscreen apps without exiting fullscreen mode
@@ -16,7 +18,11 @@ Inspired by Maccy and PastePal, but built to be faster, simpler, and actually ap
 1. Download the latest `.dmg` from [Releases](../../releases)
 2. Open the `.dmg` file
 3. Drag **PasteBro.app** to your **Applications** folder
-4. Done!
+4. **First launch:** macOS will block the app (unsigned developer)
+   - Click "Close" on the popup
+   - Go to System Preferences → Privacy & Security
+   - Click "Open Anyway" to allow the app to run
+5. Done!
 
 **To auto-launch at login:** Since this is an unsigned app, you need to add it manually:
 - Go to System Preferences → Users & Groups → Login Items
