@@ -102,10 +102,13 @@ class PasteBroApp {
     // Initialize preferences (fast, synchronous)
     this.preferencesManager = new PreferencesManager();
 
-    // Apply launch at login setting on startup
-    app.setLoginItemSettings({
-      openAtLogin: this.preferencesManager.get('launchAtLogin')
-    });
+    // Apply launch at login setting on startup (only works in packaged app)
+    if (app.isPackaged) {
+      app.setLoginItemSettings({
+        openAtLogin: this.preferencesManager.get('launchAtLogin'),
+        openAsHidden: false
+      });
+    }
 
     // Initialize permission manager
     this.permissionManager = new PermissionManager(this.preferencesManager);
@@ -484,10 +487,11 @@ class PasteBroApp {
           });
         }
 
-        // Update launch at login setting
-        if ('launchAtLogin' in prefs) {
+        // Update launch at login setting (only works in packaged app)
+        if ('launchAtLogin' in prefs && app.isPackaged) {
           app.setLoginItemSettings({
-            openAtLogin: prefs.launchAtLogin
+            openAtLogin: prefs.launchAtLogin,
+            openAsHidden: false
           });
         }
 

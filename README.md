@@ -18,6 +18,10 @@ Inspired by Maccy and PastePal, but built to be faster, simpler, and actually ap
 3. Drag **PasteBro.app** to your **Applications** folder
 4. Done!
 
+**To auto-launch at login:** Since this is an unsigned app, you need to add it manually:
+- Go to System Preferences → Users & Groups → Login Items
+- Click the `+` button and select PasteBro from Applications
+
 ## Usage
 
 - Press **Cmd+L** (or your custom hotkey) to open the sidebar
@@ -77,14 +81,6 @@ npm run build
 - macOS 10.15 or later
 - Intel or Apple Silicon Mac
 
-## Performance
-
-- Startup: < 300ms
-- Memory: ~50MB
-- Storage: ~5MB (without image storage)
-- App size: ~295MB (Electron runtime ~200MB + dependencies ~90MB + your code ~2MB)
-
-> **Why so large?** Electron bundles Chromium + Node.js for cross-platform compatibility and fast iteration. A native Swift version would be smaller, but Electron lets us ship features faster.
 
 ## License
 
