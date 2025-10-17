@@ -674,7 +674,19 @@ class PasteBroApp {
         label: 'Quit',
         click: () => {
           this.isQuitting = true;
-          app.quit();
+          
+          // Stop monitoring immediately
+          if (this.clipboardMonitor) {
+            this.clipboardMonitor.stopMonitoring();
+          }
+          
+          // Close database immediately
+          if (this.historyManager) {
+            this.historyManager.close();
+          }
+          
+          // Force quit
+          app.exit(0);
         }
       }
     ]);

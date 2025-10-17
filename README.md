@@ -82,6 +82,9 @@ npm run build
 - Startup: < 300ms
 - Memory: ~50MB
 - Storage: ~5MB (without image storage)
+- App size: ~295MB (Electron runtime ~200MB + dependencies ~90MB + your code ~2MB)
+
+> **Why so large?** Electron bundles Chromium + Node.js for cross-platform compatibility and fast iteration. A native Swift version would be smaller, but Electron lets us ship features faster.
 
 ## License
 
