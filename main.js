@@ -21,6 +21,8 @@ class PasteBroApp {
     this.imageStorageManager = null;
     this.migrationInterval = null;
     this.shortcutHealthCheck = null;
+    this._lastToggleTime = 0;
+    this._isToggling = false;
   }
 
   async initialize() {
@@ -813,24 +815,48 @@ class PasteBroApp {
   }
 
   toggleSidebar() {
+    // Debounce rapid toggles (prevent spam)
+    const now = Date.now();
+    if (this._lastToggleTime && (now - this._lastToggleTime) < 200) {
+      console.log('Toggle debounced - too fast');
+      return;
+    }
+    this._lastToggleTime = now;
+
+    // Prevent concurrent toggles
+    if (this._isToggling) {
+      console.log('Toggle already in progress');
+      return;
+    }
+
     try {
+      this._isToggling = true;
+
       if (!this.mainWindow || this.mainWindow.isDestroyed()) {
         console.error('Main window is destroyed, recreating...');
         this.createMainWindow();
-        this.showSidebar();
+        setTimeout(() => {
+          this.showSidebar();
+          this._isToggling = false;
+        }, 100);
         return;
       }
 
       if (this.mainWindow.isVisible()) {
         this.mainWindow.hide();
+        this._isToggling = false;
       } else {
         this.showSidebar();
+        this._isToggling = false;
       }
     } catch (error) {
       console.error('Error toggling sidebar:', error);
+      this._isToggling = false;
       // Recreate window if there's an error
       this.createMainWindow();
-      this.showSidebar();
+      setTimeout(() => {
+        this.showSidebar();
+      }, 100);
     }
   }
 
