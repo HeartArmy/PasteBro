@@ -21,7 +21,9 @@ class PasteBroApp {
     this.imageStorageManager = null;
     this.migrationInterval = null;
     this.shortcutHealthCheck = null;
+    this.rendererHealthCheck = null;
     this._lastToggleTime = 0;
+    this._lastActivityTime = Date.now();
     this._isToggling = false;
   }
 
@@ -694,22 +696,29 @@ class PasteBroApp {
     // Handle renderer crashes
     this.mainWindow.webContents.on('render-process-gone', (event, details) => {
       console.error('Renderer process crashed:', details);
-      // Recreate window
       setTimeout(() => {
         this.createMainWindow();
       }, 1000);
     });
 
-    // Handle unresponsive renderer
+    // Handle unresponsive renderer (common in Intel low power mode)
     this.mainWindow.on('unresponsive', () => {
-      console.error('Window became unresponsive');
-      // Try to reload
+      console.error('Window unresponsive - Intel low power mode issue');
       if (this.mainWindow && !this.mainWindow.isDestroyed()) {
         this.mainWindow.webContents.reload();
       }
     });
 
-    this._lastShownTime = 0;
+    // Periodic renderer health check for Intel low power mode
+    this.rendererHealthCheck = setInterval(() => {
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        // Send ping to renderer to keep it alive
+        this.mainWindow.webContents.executeJavaScript('Date.now()').catch(() => {
+          console.log('Renderer not responding, reloading...');
+          this.mainWindow.webContents.reload();
+        });
+      }
+    }, 5 * 60 * 1000); // Every 5 minutes
   }
 
   createTray() {
@@ -815,48 +824,47 @@ class PasteBroApp {
   }
 
   toggleSidebar() {
-    // Debounce rapid toggles (prevent spam)
+    // Light debounce for Intel low power mode
     const now = Date.now();
-    if (this._lastToggleTime && (now - this._lastToggleTime) < 200) {
-      console.log('Toggle debounced - too fast');
+    if (this._lastToggleTime && (now - this._lastToggleTime) < 150) {
       return;
     }
     this._lastToggleTime = now;
 
-    // Prevent concurrent toggles
-    if (this._isToggling) {
-      console.log('Toggle already in progress');
-      return;
-    }
-
     try {
-      this._isToggling = true;
-
       if (!this.mainWindow || this.mainWindow.isDestroyed()) {
-        console.error('Main window is destroyed, recreating...');
+        console.log('Window destroyed, recreating...');
         this.createMainWindow();
+        setTimeout(() => this.showSidebar(), 300);
+        return;
+      }
+
+      // Check if renderer is responsive (Intel low power mode issue)
+      const lastActivity = this._lastActivityTime || 0;
+      const timeSinceActivity = now - lastActivity;
+      
+      if (timeSinceActivity > 10 * 60 * 1000) { // 10 minutes
+        console.log('Renderer may be suspended, refreshing...');
+        this.mainWindow.webContents.reload();
         setTimeout(() => {
-          this.showSidebar();
-          this._isToggling = false;
-        }, 100);
+          if (this.mainWindow.isVisible()) {
+            this.mainWindow.hide();
+          } else {
+            this.showSidebar();
+          }
+        }, 500);
         return;
       }
 
       if (this.mainWindow.isVisible()) {
         this.mainWindow.hide();
-        this._isToggling = false;
       } else {
         this.showSidebar();
-        this._isToggling = false;
       }
+      
+      this._lastActivityTime = now;
     } catch (error) {
       console.error('Error toggling sidebar:', error);
-      this._isToggling = false;
-      // Recreate window if there's an error
-      this.createMainWindow();
-      setTimeout(() => {
-        this.showSidebar();
-      }, 100);
     }
   }
 
@@ -970,6 +978,12 @@ class PasteBroApp {
       if (this.shortcutHealthCheck) {
         clearInterval(this.shortcutHealthCheck);
         this.shortcutHealthCheck = null;
+      }
+
+      // Stop renderer health check
+      if (this.rendererHealthCheck) {
+        clearInterval(this.rendererHealthCheck);
+        this.rendererHealthCheck = null;
       }
 
       if (this.clipboardMonitor) {
