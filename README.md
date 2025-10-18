@@ -87,6 +87,16 @@ npm run build
 - macOS 10.15 or later
 - Intel or Apple Silicon Mac
 
+## Troubleshooting
+
+**Sidebar not appearing?**
+- Quit PasteBro from the menu bar (click icon → Quit)
+- Reopen from Applications folder
+- The app auto-recovers from sleep/wake issues
+
+**Shortcut stopped working?**
+- The app automatically re-registers shortcuts every 5 minutes
+- If it still doesn't work, restart the app
 
 ## License
 

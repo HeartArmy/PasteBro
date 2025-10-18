@@ -861,44 +861,99 @@ class PasteBroApp {
   }
 
   showSidebar() {
-    try {
-      if (!this.mainWindow || this.mainWindow.isDestroyed()) {
-        console.error('Main window is destroyed, recreating...');
-        this.createMainWindow();
-      }
-
-      const { screen } = require('electron');
-      const primaryDisplay = screen.getPrimaryDisplay();
-      const { width, height } = primaryDisplay.workAreaSize;
-
-      // Position at right edge
-      const windowWidth = 400;
-      this.mainWindow.setBounds({
-        x: width - windowWidth,
-        y: 0,
-        width: windowWidth,
-        height: height
-      });
-
-      // Force reload if window hasn't been shown in a while
-      if (this.mainWindow.webContents) {
-        const lastShown = this._lastShownTime || 0;
-        const now = Date.now();
-
-        // If window hasn't been shown in 30 minutes, reload it
-        if (now - lastShown > 30 * 60 * 1000) {
-          console.log('Window idle for 30+ minutes, reloading...');
-          this.mainWindow.webContents.reload();
+    const maxRetries = 3;
+    const attemptShow = (retryCount = 0) => {
+      try {
+        // Always validate window exists
+        if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+          console.error(`Window destroyed, recreating... (attempt ${retryCount + 1}/${maxRetries})`);
+          this.createMainWindow();
+          
+          // Wait for window creation then retry
+          setTimeout(() => {
+            if (retryCount < maxRetries) {
+              attemptShow(retryCount + 1);
+            }
+          }, 500);
+          return;
         }
 
-        this._lastShownTime = now;
-      }
+        const { screen } = require('electron');
+        const primaryDisplay = screen.getPrimaryDisplay();
+        const { width, height } = primaryDisplay.workAreaSize;
 
-      this.mainWindow.show();
-      this.mainWindow.focus();
-    } catch (error) {
-      console.error('Error showing sidebar:', error);
-    }
+        // Position at right edge
+        const windowWidth = 400;
+        this.mainWindow.setBounds({
+          x: width - windowWidth,
+          y: 0,
+          width: windowWidth,
+          height: height
+        });
+
+        // Force reload if window hasn't been shown in a while
+        if (this.mainWindow.webContents) {
+          const lastShown = this._lastShownTime || 0;
+          const now = Date.now();
+
+          // If window hasn't been shown in 10 minutes, reload it
+          if (now - lastShown > 10 * 60 * 1000) {
+            console.log('Window idle for 10+ minutes, reloading...');
+            this.mainWindow.webContents.reload();
+            
+            // Wait for reload then retry
+            setTimeout(() => {
+              if (retryCount < maxRetries) {
+                attemptShow(retryCount + 1);
+              }
+            }, 300);
+            return;
+          }
+
+          this._lastShownTime = now;
+        }
+
+        // Show window
+        this.mainWindow.show();
+        this.mainWindow.focus();
+
+        // Verify it actually showed
+        setTimeout(() => {
+          if (this.mainWindow && !this.mainWindow.isDestroyed() && !this.mainWindow.isVisible()) {
+            console.error('Window failed to show, retrying...');
+            if (retryCount < maxRetries) {
+              this.mainWindow.showInactive();
+              this.mainWindow.focus();
+              
+              // If still not visible, recreate
+              setTimeout(() => {
+                if (!this.mainWindow.isVisible()) {
+                  console.error('Force recreating window');
+                  this.createMainWindow();
+                  attemptShow(retryCount + 1);
+                }
+              }, 200);
+            }
+          }
+        }, 100);
+
+      } catch (error) {
+        console.error(`Error showing sidebar (attempt ${retryCount + 1}/${maxRetries}):`, error);
+        
+        // Retry with fresh window
+        if (retryCount < maxRetries) {
+          this.createMainWindow();
+          setTimeout(() => {
+            attemptShow(retryCount + 1);
+          }, 500);
+        } else {
+          console.error('Failed to show sidebar after max retries');
+        }
+      }
+    };
+
+    // Start the attempt chain
+    attemptShow(0);
   }
 
   openPreferences() {
