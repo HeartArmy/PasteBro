@@ -19,18 +19,20 @@ class PasteBroApp {
     this.preferencesManager = null;
     this.permissionManager = null;
     this.imageStorageManager = null;
+    this.migrationInterval = null;
+    this.shortcutHealthCheck = null;
   }
 
   async initialize() {
     const startTime = Date.now();
 
-    // Wait for app to be ready
-    await app.whenReady();
-
-    // Hide dock icon (menu bar app only)
+    // Hide dock icon BEFORE app is ready (menu bar app only)
     if (process.platform === 'darwin') {
       app.dock.hide();
     }
+
+    // Wait for app to be ready
+    await app.whenReady();
 
     // PHASE 1: Immediate - Create tray icon first (< 100ms)
     this.createTray();
@@ -58,7 +60,7 @@ class PasteBroApp {
 
   startBackgroundMigration() {
     // Check for BLOB images to migrate every 2 seconds
-    setInterval(async () => {
+    this.migrationInterval = setInterval(async () => {
       try {
         const items = this.historyManager.db.query({
           limit: 10, // Migrate 10 at a time
@@ -166,28 +168,38 @@ class PasteBroApp {
       console.log(`Migrating ${blobItems.length} BLOB images to file storage...`);
 
       let migrated = 0;
-      for (const item of blobItems) {
-        try {
-          // Save to file storage
-          const { imagePath, thumbnailPath } = await this.imageStorageManager.saveImage(
-            item.imageData,
-            item.id
-          );
 
-          // Update database
-          await this.historyManager.db.update(item.id, {
-            image_path: imagePath,
-            thumbnail_path: thumbnailPath
-          });
+      // Process in batches to avoid memory issues
+      const batchSize = 5;
+      for (let i = 0; i < blobItems.length; i += batchSize) {
+        const batch = blobItems.slice(i, i + batchSize);
 
-          migrated++;
+        await Promise.all(batch.map(async (item) => {
+          try {
+            // Save to file storage
+            const { imagePath, thumbnailPath } = await this.imageStorageManager.saveImage(
+              item.imageData,
+              item.id
+            );
 
-          if (migrated % 10 === 0) {
-            console.log(`Migrated ${migrated}/${blobItems.length} images`);
+            // Update database
+            await this.historyManager.db.update(item.id, {
+              image_path: imagePath,
+              thumbnail_path: thumbnailPath
+            });
+
+            migrated++;
+          } catch (error) {
+            console.error(`Failed to migrate image ${item.id}:`, error);
           }
-        } catch (error) {
-          console.error(`Failed to migrate image ${item.id}:`, error);
+        }));
+
+        if (migrated % 10 === 0) {
+          console.log(`Migrated ${migrated}/${blobItems.length} images`);
         }
+
+        // Allow event loop to breathe
+        await new Promise(resolve => setImmediate(resolve));
       }
 
       console.log(`Migration complete: ${migrated}/${blobItems.length} images migrated`);
@@ -200,7 +212,7 @@ class PasteBroApp {
     try {
       // Handle both single item and array of items
       const items = Array.isArray(item) ? item : [item];
-      
+
       for (const singleItem of items) {
         // Add item to history (non-blocking)
         this.historyManager.addItem(singleItem).then(itemId => {
@@ -655,6 +667,7 @@ class PasteBroApp {
         event.preventDefault();
         this.mainWindow.hide();
       }
+      return false;
     });
 
     // Handle blur (click outside)
@@ -690,17 +703,23 @@ class PasteBroApp {
         label: 'Quit',
         click: () => {
           this.isQuitting = true;
-          
+
+          // Stop migration interval
+          if (this.migrationInterval) {
+            clearInterval(this.migrationInterval);
+            this.migrationInterval = null;
+          }
+
           // Stop monitoring immediately
           if (this.clipboardMonitor) {
             this.clipboardMonitor.stopMonitoring();
           }
-          
+
           // Close database immediately
           if (this.historyManager) {
             this.historyManager.close();
           }
-          
+
           // Force quit
           app.exit(0);
         }
@@ -716,15 +735,49 @@ class PasteBroApp {
     // Get hotkey from preferences
     const hotkey = this.preferencesManager.get('globalHotkey') || 'Command+L';
 
+    // Unregister first to avoid conflicts
+    globalShortcut.unregisterAll();
+
     const ret = globalShortcut.register(hotkey, () => {
       this.toggleSidebar();
     });
 
     if (!ret) {
       console.error('Global shortcut registration failed for:', hotkey);
+      // Retry once after a delay
+      setTimeout(() => {
+        const retry = globalShortcut.register(hotkey, () => {
+          this.toggleSidebar();
+        });
+        if (retry) {
+          console.log('Global shortcut registered on retry:', hotkey);
+        } else {
+          console.error('Global shortcut registration failed on retry:', hotkey);
+        }
+      }, 1000);
     } else {
       console.log('Global shortcut registered:', hotkey);
     }
+
+    // Periodic health check - re-register if lost (every 5 minutes)
+    if (this.shortcutHealthCheck) {
+      clearInterval(this.shortcutHealthCheck);
+    }
+
+    this.shortcutHealthCheck = setInterval(() => {
+      const isRegistered = globalShortcut.isRegistered(hotkey);
+      if (!isRegistered) {
+        console.warn('Global shortcut lost, re-registering:', hotkey);
+        const reregistered = globalShortcut.register(hotkey, () => {
+          this.toggleSidebar();
+        });
+        if (reregistered) {
+          console.log('Global shortcut re-registered successfully');
+        } else {
+          console.error('Failed to re-register global shortcut');
+        }
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
   }
 
   toggleSidebar() {
@@ -805,6 +858,34 @@ class PasteBroApp {
   }
 
   setupAppLifecycle() {
+    // Handle macOS system shutdown/restart
+    app.on('before-quit', (event) => {
+      this.isQuitting = true;
+
+      // Clean up immediately
+      globalShortcut.unregisterAll();
+
+      // Stop migration interval
+      if (this.migrationInterval) {
+        clearInterval(this.migrationInterval);
+        this.migrationInterval = null;
+      }
+
+      // Stop shortcut health check
+      if (this.shortcutHealthCheck) {
+        clearInterval(this.shortcutHealthCheck);
+        this.shortcutHealthCheck = null;
+      }
+
+      if (this.clipboardMonitor) {
+        this.clipboardMonitor.stopMonitoring();
+      }
+
+      if (this.historyManager) {
+        this.historyManager.close();
+      }
+    });
+
     // Quit when all windows are closed (except on macOS)
     app.on('window-all-closed', () => {
       if (process.platform !== 'darwin') {
@@ -815,6 +896,18 @@ class PasteBroApp {
     // Unregister shortcuts on quit
     app.on('will-quit', () => {
       globalShortcut.unregisterAll();
+
+      // Stop migration interval
+      if (this.migrationInterval) {
+        clearInterval(this.migrationInterval);
+        this.migrationInterval = null;
+      }
+
+      // Stop shortcut health check
+      if (this.shortcutHealthCheck) {
+        clearInterval(this.shortcutHealthCheck);
+        this.shortcutHealthCheck = null;
+      }
 
       // Stop clipboard monitoring
       if (this.clipboardMonitor) {
@@ -833,9 +926,69 @@ class PasteBroApp {
         this.createMainWindow();
       }
     });
+
+    // Handle system sleep/wake - re-register shortcuts after wake
+    if (process.platform === 'darwin') {
+      const { powerMonitor } = require('electron');
+
+      powerMonitor.on('suspend', () => {
+        console.log('System going to sleep');
+        // Unregister shortcuts before sleep
+        globalShortcut.unregisterAll();
+      });
+
+      powerMonitor.on('resume', () => {
+        console.log('System waking from sleep');
+        // Re-register shortcuts after wake
+        setTimeout(() => {
+          this.registerGlobalShortcuts();
+        }, 1000); // Wait 1 second for system to stabilize
+      });
+
+      powerMonitor.on('lock-screen', () => {
+        console.log('Screen locked');
+      });
+
+      powerMonitor.on('unlock-screen', () => {
+        console.log('Screen unlocked');
+        // Re-register shortcuts after unlock (some Macs lose them)
+        setTimeout(() => {
+          globalShortcut.unregisterAll();
+          this.registerGlobalShortcuts();
+        }, 500);
+      });
+    }
   }
+}
+
+// Process monitoring for production
+if (process.env.NODE_ENV === 'production') {
+  process.on('uncaughtException', (error) => {
+    console.error('Uncaught exception:', error);
+    // Log but don't crash
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled rejection at:', promise, 'reason:', reason);
+    // Log but don't crash
+  });
+}
+
+// Memory monitoring (log every 5 minutes in production)
+if (process.env.NODE_ENV === 'production') {
+  setInterval(() => {
+    const usage = process.memoryUsage();
+    console.log('Memory usage:', {
+      rss: `${Math.round(usage.rss / 1024 / 1024)}MB`,
+      heapUsed: `${Math.round(usage.heapUsed / 1024 / 1024)}MB`,
+      heapTotal: `${Math.round(usage.heapTotal / 1024 / 1024)}MB`
+    });
+  }, 5 * 60 * 1000);
 }
 
 // Create and initialize app
 const pasteBroApp = new PasteBroApp();
-pasteBroApp.initialize().catch(console.error);
+pasteBroApp.initialize().catch((error) => {
+  console.error('Failed to initialize app:', error);
+  app.quit();
+});

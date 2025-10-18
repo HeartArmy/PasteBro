@@ -4,17 +4,34 @@ let selectedItems = new Set();
 let selectionOrder = []; // Track order of selection
 let currentFilter = 'all';
 
+// Global error handler
+window.addEventListener('error', (event) => {
+  console.error('Uncaught error:', event.error);
+  // Prevent app crash
+  event.preventDefault();
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled promise rejection:', event.reason);
+  // Prevent app crash
+  event.preventDefault();
+});
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
-  setupEventListeners();
-  loadClipboardHistory();
-  
-  // Clear selections when window becomes visible
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-      clearSelections();
-    }
-  });
+  try {
+    setupEventListeners();
+    loadClipboardHistory();
+    
+    // Clear selections when window becomes visible
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        clearSelections();
+      }
+    });
+  } catch (error) {
+    console.error('Failed to initialize app:', error);
+  }
 });
 
 function setupEventListeners() {
@@ -41,6 +58,10 @@ function setupEventListeners() {
   if (window.electronAPI) {
     window.electronAPI.onClipboardUpdate((item) => {
       clipboardItems.unshift(item);
+      // Limit array size to prevent memory growth
+      if (clipboardItems.length > 1000) {
+        clipboardItems = clipboardItems.slice(0, 1000);
+      }
       renderItems();
     });
   }
@@ -227,8 +248,18 @@ function renderItems(searchQuery = '') {
     return b.timestamp - a.timestamp;
   });
   
-  // Render
-  container.innerHTML = filteredItems.map(item => createItemHTML(item)).join('');
+  // Use DocumentFragment for better performance
+  const fragment = document.createDocumentFragment();
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = filteredItems.map(item => createItemHTML(item)).join('');
+  
+  while (tempDiv.firstChild) {
+    fragment.appendChild(tempDiv.firstChild);
+  }
+  
+  // Clear and append in one operation
+  container.innerHTML = '';
+  container.appendChild(fragment);
   
   // Attach event listeners
   container.querySelectorAll('.clipboard-item').forEach(el => {
@@ -329,16 +360,18 @@ function createItemHTML(item) {
 function getItemPreview(item) {
   if (item.type === 'text' || item.type === 'richText') {
     if (item.plainText) {
-      return escapeHtml(item.plainText.substring(0, 100));
+      // Limit preview length to prevent DOM bloat
+      const preview = item.plainText.substring(0, 200);
+      return escapeHtml(preview);
     }
   } else if (item.type === 'image') {
-    // Show actual image thumbnail
+    // Show actual image thumbnail with lazy loading
     if (item.thumbnailPath) {
-      // Use thumbnail from file storage
-      return `<img src="file://${item.thumbnailPath}" style="max-width: 100%; max-height: 120px; border-radius: 4px;" alt="Image">`;
+      // Use thumbnail from file storage with lazy loading
+      return `<img src="file://${item.thumbnailPath}" loading="lazy" style="max-width: 100%; max-height: 120px; border-radius: 4px;" alt="Image">`;
     } else if (item.imagePath) {
-      // Use full image if no thumbnail
-      return `<img src="file://${item.imagePath}" style="max-width: 100%; max-height: 120px; border-radius: 4px;" alt="Image">`;
+      // Use full image if no thumbnail with lazy loading
+      return `<img src="file://${item.imagePath}" loading="lazy" style="max-width: 100%; max-height: 120px; border-radius: 4px;" alt="Image">`;
     } else if (item.plainText) {
       const fileName = item.plainText.split('/').pop();
       return `🖼️ ${escapeHtml(fileName)}`;
@@ -646,9 +679,18 @@ function showContextMenu(event, itemId) {
   
   document.body.appendChild(menu);
   
-  // Close menu on click outside
+  // Close menu on click outside or escape
+  const closeMenu = () => {
+    if (menu.parentNode) {
+      menu.remove();
+    }
+  };
+  
   setTimeout(() => {
-    document.addEventListener('click', () => menu.remove(), { once: true });
+    document.addEventListener('click', closeMenu, { once: true });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeMenu();
+    }, { once: true });
   }, 0);
 }
 

@@ -25,7 +25,14 @@ class DatabaseManager {
     init() {
         try {
             this.db = new Database(this.dbPath);
-            this.db.pragma('journal_mode = WAL'); // Better performance
+            
+            // Performance optimizations for better-sqlite3
+            this.db.pragma('journal_mode = WAL'); // Write-Ahead Logging
+            this.db.pragma('synchronous = NORMAL'); // Faster writes, still safe
+            this.db.pragma('cache_size = -64000'); // 64MB cache
+            this.db.pragma('temp_store = MEMORY'); // Use memory for temp tables
+            this.db.pragma('mmap_size = 30000000000'); // Memory-mapped I/O
+            
             this.initSchema();
             this.runMigrations();
             return true;
@@ -238,6 +245,10 @@ class DatabaseManager {
      * Get a single item by ID
      */
     getById(id) {
+        if (typeof id !== 'string' || !id) {
+            throw new Error('Invalid ID');
+        }
+        
         try {
             const stmt = this.db.prepare('SELECT * FROM clipboard_items WHERE id = ?');
             const row = stmt.get(id);
@@ -252,18 +263,25 @@ class DatabaseManager {
      * Search items by text content
      */
     search(query, options = {}) {
+        if (typeof query !== 'string') {
+            throw new Error('Invalid search query');
+        }
+        
+        // Sanitize query to prevent SQL injection
+        const sanitizedQuery = query.replace(/[%_]/g, '\\$&');
+        
         const { limit = 50, offset = 0, isDeleted = false } = options;
 
         const sql = `
             SELECT * FROM clipboard_items 
             WHERE is_deleted = ? 
-            AND (plain_text LIKE ? OR file_paths LIKE ?)
+            AND (plain_text LIKE ? ESCAPE '\\' OR file_paths LIKE ? ESCAPE '\\')
             ORDER BY timestamp DESC
             LIMIT ? OFFSET ?
         `;
 
         try {
-            const searchPattern = `%${query}%`;
+            const searchPattern = `%${sanitizedQuery}%`;
             const stmt = this.db.prepare(sql);
             const rows = stmt.all(isDeleted ? 1 : 0, searchPattern, searchPattern, limit, offset);
             return rows.map(row => this.rowToItem(row));
@@ -327,6 +345,11 @@ class DatabaseManager {
     delete(ids) {
         if (!Array.isArray(ids)) {
             ids = [ids];
+        }
+        
+        // Validate all IDs are strings
+        if (!ids.every(id => typeof id === 'string' && id)) {
+            throw new Error('Invalid IDs');
         }
 
         const placeholders = ids.map(() => '?').join(',');

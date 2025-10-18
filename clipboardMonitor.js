@@ -17,6 +17,14 @@ class ClipboardMonitor {
         this.pollInterval = 50; // 50ms as per requirements
         this.isMonitoring = false;
         this.isPaused = false;
+        
+        // Cache for getActiveApplication
+        this._cachedApp = null;
+        this._cachedAppTime = 0;
+        this._errorLogged = false;
+        
+        // Debounce async operations
+        this._processingClipboard = false;
     }
 
     /**
@@ -74,9 +82,17 @@ class ClipboardMonitor {
 
     /**
      * Check clipboard for changes
+     * Debounced to prevent race conditions
      */
     async checkClipboard() {
+        // Skip if already processing to prevent race conditions
+        if (this._processingClipboard) {
+            return;
+        }
+        
         try {
+            this._processingClipboard = true;
+            
             const content = this.captureClipboardContent();
 
             if (!content) {
@@ -108,6 +124,8 @@ class ClipboardMonitor {
             }
         } catch (error) {
             console.error('Error checking clipboard:', error);
+        } finally {
+            this._processingClipboard = false;
         }
     }
 
@@ -242,16 +260,32 @@ class ClipboardMonitor {
 
     /**
      * Get active application name (macOS)
+     * Cached to avoid expensive execSync calls every 50ms
      */
     getActiveApplication() {
         try {
+            // Cache for 1 second to reduce CPU usage
+            const now = Date.now();
+            if (this._cachedApp && this._cachedAppTime && (now - this._cachedAppTime) < 1000) {
+                return this._cachedApp;
+            }
+            
             if (process.platform === 'darwin') {
                 const { execSync } = require('child_process');
-                const result = execSync('osascript -e \'tell application "System Events" to get name of first application process whose frontmost is true\'', { encoding: 'utf8' });
-                return result.trim();
+                const result = execSync('osascript -e \'tell application "System Events" to get name of first application process whose frontmost is true\'', { 
+                    encoding: 'utf8',
+                    timeout: 500 // Prevent hanging
+                });
+                this._cachedApp = result.trim();
+                this._cachedAppTime = now;
+                return this._cachedApp;
             }
         } catch (error) {
-            console.error('Error getting active application:', error);
+            // Silent fail - don't spam logs
+            if (!this._errorLogged) {
+                console.error('Error getting active application:', error);
+                this._errorLogged = true;
+            }
         }
         return null;
     }
@@ -268,12 +302,21 @@ class ClipboardMonitor {
     }
 
     /**
-     * Load image from file path
+     * Load image from file path with size limit
      */
     loadImageFromFile(filePath) {
         try {
             const fs = require('fs');
             if (fs.existsSync(filePath)) {
+                // Check file size first to prevent loading huge files
+                const stats = fs.statSync(filePath);
+                const maxSize = 50 * 1024 * 1024; // 50MB limit
+                
+                if (stats.size > maxSize) {
+                    console.warn(`Image file too large (${Math.round(stats.size / 1024 / 1024)}MB): ${filePath}`);
+                    return null;
+                }
+                
                 return fs.readFileSync(filePath);
             }
         } catch (error) {

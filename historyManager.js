@@ -11,6 +11,7 @@ class HistoryManager {
         this.db.init();
         this.maxItems = 1000;
         this.retentionDays = 30;
+        this._insertCount = 0;
     }
 
     /**
@@ -27,7 +28,6 @@ class HistoryManager {
                 this.db.update(existingId, {
                     timestamp: item.timestamp
                 });
-                console.log('Updated timestamp for existing item:', existingId);
                 return existingId;
             }
 
@@ -35,10 +35,12 @@ class HistoryManager {
             const success = this.db.insert(item.toDatabase());
             
             if (success) {
-                console.log('Added new clipboard item:', item.id);
-                
-                // Enforce storage limits
-                this.enforceStorageLimits();
+                // Enforce storage limits periodically (every 10 items) instead of every insert
+                this._insertCount = (this._insertCount || 0) + 1;
+                if (this._insertCount % 10 === 0) {
+                    // Run in background to not block
+                    setImmediate(() => this.enforceStorageLimits());
+                }
                 
                 return item.id;
             }

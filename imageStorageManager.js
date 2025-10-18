@@ -94,6 +94,11 @@ class ImageStorageManager {
    * Delete image and thumbnail files
    */
   async deleteImage(id) {
+    // Validate ID to prevent path traversal
+    if (typeof id !== 'string' || !id || id.includes('..') || id.includes('/') || id.includes('\\')) {
+      throw new Error('Invalid image ID');
+    }
+    
     try {
       const imagePath = path.join(this.imagesPath, `${id}.png`);
       const thumbnailPath = path.join(this.thumbnailsPath, `${id}.jpg`);
@@ -142,6 +147,11 @@ class ImageStorageManager {
    * Read image file
    */
   async readImage(id) {
+    // Validate ID to prevent path traversal
+    if (typeof id !== 'string' || !id || id.includes('..') || id.includes('/') || id.includes('\\')) {
+      throw new Error('Invalid image ID');
+    }
+    
     try {
       const imagePath = this.getImagePath(id);
       return await fs.readFile(imagePath);
@@ -155,6 +165,11 @@ class ImageStorageManager {
    * Read thumbnail file
    */
   async readThumbnail(id) {
+    // Validate ID to prevent path traversal
+    if (typeof id !== 'string' || !id || id.includes('..') || id.includes('/') || id.includes('\\')) {
+      throw new Error('Invalid image ID');
+    }
+    
     try {
       const thumbnailPath = this.getThumbnailPath(id);
       return await fs.readFile(thumbnailPath);
