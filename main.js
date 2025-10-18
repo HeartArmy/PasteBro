@@ -633,6 +633,11 @@ class PasteBroApp {
   }
 
   createMainWindow() {
+    // Clean up old window if it exists
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.destroy();
+    }
+
     this.mainWindow = new BrowserWindow({
       width: 400,
       height: 800,
@@ -646,7 +651,8 @@ class PasteBroApp {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        preload: path.join(__dirname, 'preload.js')
+        preload: path.join(__dirname, 'preload.js'),
+        backgroundThrottling: false // Prevent throttling when hidden
       }
     });
 
@@ -676,6 +682,32 @@ class PasteBroApp {
         this.mainWindow.hide();
       }
     });
+
+    // Prevent renderer from being suspended
+    this.mainWindow.webContents.on('did-finish-load', () => {
+      // Keep renderer process alive
+      this.mainWindow.webContents.setBackgroundThrottling(false);
+    });
+
+    // Handle renderer crashes
+    this.mainWindow.webContents.on('render-process-gone', (event, details) => {
+      console.error('Renderer process crashed:', details);
+      // Recreate window
+      setTimeout(() => {
+        this.createMainWindow();
+      }, 1000);
+    });
+
+    // Handle unresponsive renderer
+    this.mainWindow.on('unresponsive', () => {
+      console.error('Window became unresponsive');
+      // Try to reload
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.webContents.reload();
+      }
+    });
+
+    this._lastShownTime = 0;
   }
 
   createTray() {
@@ -781,29 +813,66 @@ class PasteBroApp {
   }
 
   toggleSidebar() {
-    if (this.mainWindow.isVisible()) {
-      this.mainWindow.hide();
-    } else {
+    try {
+      if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+        console.error('Main window is destroyed, recreating...');
+        this.createMainWindow();
+        this.showSidebar();
+        return;
+      }
+
+      if (this.mainWindow.isVisible()) {
+        this.mainWindow.hide();
+      } else {
+        this.showSidebar();
+      }
+    } catch (error) {
+      console.error('Error toggling sidebar:', error);
+      // Recreate window if there's an error
+      this.createMainWindow();
       this.showSidebar();
     }
   }
 
   showSidebar() {
-    const { screen } = require('electron');
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width, height } = primaryDisplay.workAreaSize;
+    try {
+      if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+        console.error('Main window is destroyed, recreating...');
+        this.createMainWindow();
+      }
 
-    // Position at right edge
-    const windowWidth = 400;
-    this.mainWindow.setBounds({
-      x: width - windowWidth,
-      y: 0,
-      width: windowWidth,
-      height: height
-    });
+      const { screen } = require('electron');
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width, height } = primaryDisplay.workAreaSize;
 
-    this.mainWindow.show();
-    this.mainWindow.focus();
+      // Position at right edge
+      const windowWidth = 400;
+      this.mainWindow.setBounds({
+        x: width - windowWidth,
+        y: 0,
+        width: windowWidth,
+        height: height
+      });
+
+      // Force reload if window hasn't been shown in a while
+      if (this.mainWindow.webContents) {
+        const lastShown = this._lastShownTime || 0;
+        const now = Date.now();
+
+        // If window hasn't been shown in 30 minutes, reload it
+        if (now - lastShown > 30 * 60 * 1000) {
+          console.log('Window idle for 30+ minutes, reloading...');
+          this.mainWindow.webContents.reload();
+        }
+
+        this._lastShownTime = now;
+      }
+
+      this.mainWindow.show();
+      this.mainWindow.focus();
+    } catch (error) {
+      console.error('Error showing sidebar:', error);
+    }
   }
 
   openPreferences() {
@@ -939,10 +1008,17 @@ class PasteBroApp {
 
       powerMonitor.on('resume', () => {
         console.log('System waking from sleep');
+
         // Re-register shortcuts after wake
         setTimeout(() => {
           this.registerGlobalShortcuts();
         }, 1000); // Wait 1 second for system to stabilize
+
+        // Reload main window to prevent hanging
+        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+          console.log('Reloading main window after wake');
+          this.mainWindow.webContents.reload();
+        }
       });
 
       powerMonitor.on('lock-screen', () => {
