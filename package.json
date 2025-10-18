@@ -6,9 +6,10 @@
   "scripts": {
     "start": "electron .",
     "postinstall": "electron-rebuild",
-    "build": "electron-builder --mac",
-    "build:intel": "electron-builder --mac --x64",
-    "build:arm": "electron-builder --mac --arm64"
+    "clean": "rm -rf dist/",
+    "build": "npm run clean && electron-builder --mac",
+    "build:intel": "npm run clean && electron-builder --mac --x64",
+    "build:arm": "npm run clean && electron-builder --mac --arm64"
   },
   "keywords": [
     "clipboard",
