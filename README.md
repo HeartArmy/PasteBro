@@ -15,7 +15,7 @@ Inspired by Maccy and PastePal, but built to be faster, simpler, and actually ap
 
 ## Installation (macOS Intel)
 
-1. Download the latest `.dmg` from [Releases](../../releases)
+1. Download the latest `.dmg` from https://heartarmy.itch.io/pastebro
 2. Open the `.dmg` file
 3. Drag **PasteBro.app** to your **Applications** folder
 4. **First launch:** macOS will block the app (unsigned developer)
